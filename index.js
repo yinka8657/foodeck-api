@@ -17,7 +17,8 @@ const allowedOrigins = [
   "http://127.0.0.1:3000",
   "http://localhost:5000",
   "https://afrifoody.onrender.com",
-  "https://afrifoody.netlify.app"
+  "https://afrifoody.netlify.app",
+  "https://afrifoody.app"
 ];
 
 app.set("trust proxy", 1); 
