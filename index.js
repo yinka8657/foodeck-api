@@ -351,22 +351,23 @@ app.post("/api/ingredients", async (req, res) => {
 // Rating Endpoints
 // ==========================
 
-// POST /api/recipes/:id/rating  - create or update user's rating for a recipe
+// POST /api/recipes/:id/rating
 app.post("/api/recipes/:id/rating", async (req, res) => {
   try {
     const { id: recipe_id } = req.params;
     const { rating, user_id } = req.body;
 
-    if (!recipe_id || (rating === undefined || rating === null) || !user_id) {
+    if (!recipe_id || rating == null || !user_id) {
       return res.status(400).json({ error: "recipe_id, rating, and user_id are required" });
     }
 
-    // Upsert so a user can only have one rating per recipe
     const { data, error } = await supabase
       .from("ratings")
-      .upsert([{ recipe_id: parseInt(recipe_id, 10), rating: parseInt(rating, 10), user_id }], { onConflict: ["recipe_id", "user_id"] })
+      .upsert(
+        [{ recipe_id: parseInt(recipe_id, 10), rating: parseInt(rating, 10), user_id }],
+        { onConflict: ["recipe_id", "user_id"] }
+      )
       .select();
-
     if (error) throw error;
 
     res.json({ success: true, data });
@@ -376,7 +377,7 @@ app.post("/api/recipes/:id/rating", async (req, res) => {
   }
 });
 
-// GET /api/recipes/:id/rating/:userId - fetch user's rating for recipe
+// GET /api/recipes/:id/rating/:userId
 app.get("/api/recipes/:id/rating/:userId", async (req, res) => {
   try {
     const { id: recipe_id, userId } = req.params;
@@ -386,7 +387,6 @@ app.get("/api/recipes/:id/rating/:userId", async (req, res) => {
       .eq("recipe_id", parseInt(recipe_id, 10))
       .eq("user_id", userId)
       .maybeSingle();
-
     if (error) throw error;
 
     res.json({ rating: data?.rating ?? null });
@@ -396,15 +396,11 @@ app.get("/api/recipes/:id/rating/:userId", async (req, res) => {
   }
 });
 
-// GET /api/recipes/:id/ratings/average - fetch average rating for recipe
+// GET /api/recipes/:id/ratings/average
 app.get("/api/recipes/:id/ratings/average", async (req, res) => {
   try {
     const { id: recipe_id } = req.params;
-    const { data, error } = await supabase
-      .from("ratings")
-      .select("rating")
-      .eq("recipe_id", parseInt(recipe_id, 10));
-
+    const { data, error } = await supabase.from("ratings").select("rating").eq("recipe_id", parseInt(recipe_id, 10));
     if (error) throw error;
 
     const ratings = (data || []).map((r) => Number(r.rating)).filter((n) => !Number.isNaN(n));
@@ -414,6 +410,41 @@ app.get("/api/recipes/:id/ratings/average", async (req, res) => {
   } catch (err) {
     console.error("Average rating error:", err);
     res.status(500).json({ error: "Failed to fetch average rating" });
+  }
+});
+
+// NEW: GET /api/recipes/ratings/average?ids=1,2,3
+app.get("/api/recipes/ratings/average", async (req, res) => {
+  try {
+    const ids = (req.query.ids || "")
+      .split(",")
+      .map((id) => parseInt(id, 10))
+      .filter((id) => !isNaN(id));
+
+    if (ids.length === 0) {
+      return res.status(400).json({ error: "ids query param required (comma separated)" });
+    }
+
+    const { data, error } = await supabase.from("ratings").select("recipe_id, rating").in("recipe_id", ids);
+    if (error) throw error;
+
+    const grouped = {};
+    (data || []).forEach((row) => {
+      if (!grouped[row.recipe_id]) grouped[row.recipe_id] = [];
+      grouped[row.recipe_id].push(Number(row.rating));
+    });
+
+    const result = {};
+    ids.forEach((id) => {
+      const ratings = grouped[id] || [];
+      const avg = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0;
+      result[id] = { average: avg, count: ratings.length };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Batch average rating error:", err);
+    res.status(500).json({ error: "Failed to fetch batch averages" });
   }
 });
 
