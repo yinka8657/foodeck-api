@@ -251,45 +251,38 @@ app.post("/api/recipes/suggest", async (req, res) => {
 app.get("/api/recipes/:uuid/comments", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
-    if (!uuidRegex.test(recipe_uuid)) return res.status(400).json({ error: "Invalid recipe UUID" });
+    if (!uuidRegex.test(recipe_uuid))
+      return res.status(400).json({ error: "Invalid recipe UUID" });
 
     const { data: comments, error } = await supabase
       .from("comments")
       .select("id, comment_uuid, text, user_id, created_at, replies")
       .eq("recipe_id", recipe_uuid)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
+
     if (error) throw error;
 
-    const commentUuids = comments.map(c => c.comment_uuid);
+    // 🔎 Debug log goes here
+    console.log("Fetched comments from DB:", comments);
 
-    let replies = [];
-    if (commentUuids.length > 0) {
-      const { data: replyData, error: replyErr } = await supabase
+    for (const comment of comments) {
+      const { data: replies, error: replyError } = await supabase
         .from("replies")
-        .select("id, comment_id, text, user_id, created_at")
-        .in("comment_id", commentUuids)
+        .select("id, reply_uuid, text, user_id, created_at, parent_id")
+        .eq("comment_id", comment.comment_uuid)
         .order("created_at", { ascending: true });
-      if (replyErr) throw replyErr;
-      replies = replyData;
+
+      if (replyError) throw replyError;
+      comment.replies = replies;
     }
 
-    const repliesByComment = {};
-    replies.forEach(r => {
-      if (!repliesByComment[r.comment_id]) repliesByComment[r.comment_id] = [];
-      repliesByComment[r.comment_id].push(r);
-    });
-
-    const result = comments.map(c => ({
-      ...c,
-      replies: repliesByComment[c.comment_uuid] || []
-    }));
-
-    res.json(result);
+    res.json(comments);
   } catch (err) {
-    console.error("Comments fetch error:", err);
+    console.error("Error fetching comments:", err);
     res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
+
 
 app.post("/api/recipes/:uuid/comments", async (req, res) => {
   try {
