@@ -336,11 +336,13 @@ app.post("/api/comments/:id/replies", async (req, res) => {
 // LIKES
 // ==========================
 // Get like count & user liked status
+// Get like count & user liked status
 app.get("/api/comments/:id/like-status", async (req, res) => {
   try {
-    const commentId = parseInt(req.params.id, 10);
-    const userId = req.query.user_id;  // <-- use string UUID
-    if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
+    const commentId = req.params.id; // <-- UUID string now
+    const userId = req.query.user_id;  
+    if (!uuidRegex.test(commentId) || !userId) 
+      return res.status(400).json({ error: "Invalid commentId or userId" });
 
     // Count likes
     const { data: likes, error: countErr } = await supabase
@@ -370,9 +372,10 @@ app.get("/api/comments/:id/like-status", async (req, res) => {
 // Toggle like
 app.post("/api/comments/:id/like", async (req, res) => {
   try {
-    const commentId = parseInt(req.params.id, 10);
-    const userId = req.body.user_id; // <-- use string UUID
-    if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
+    const commentId = req.params.id; // <-- UUID string
+    const userId = req.body.user_id; 
+    if (!uuidRegex.test(commentId) || !userId) 
+      return res.status(400).json({ error: "Invalid commentId or userId" });
 
     // Check if user already liked
     const { data: existing, error: existErr } = await supabase
@@ -414,6 +417,7 @@ app.post("/api/comments/:id/like", async (req, res) => {
     res.status(500).json({ error: "Failed to toggle like" });
   }
 });
+
 
 
 // ==========================
