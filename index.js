@@ -15,35 +15,32 @@ const PORT = process.env.PORT || 5000;
 // CORS CONFIGURATION
 // ==========================
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:5000",
   "https://afrifoody.onrender.com",
   "https://afrifoody.netlify.app",
   "https://afrifoody.app"
 ];
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    console.log("Incoming request origin:", origin);
+
+    if (!origin) return callback(null, true); // allow non-browser requests
+    if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    return callback(new Error(`CORS blocked: ${origin} not allowed.`));
+  },
+  credentials: true,
+};
+
 app.set("trust proxy", 1);
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      console.log("Incoming request origin:", origin);
-      // allow non-browser requests (curl, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS blocked: ${origin} not allowed.`));
-    },
-    credentials: true,
-  })
-);
-
+app.use(cors(corsOptions));
 app.use(compression());
 app.use(express.json());
 app.use(helmet());
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
@@ -53,13 +50,10 @@ app.use(
 // ==========================
 // AUTH ENDPOINTS
 // ==========================
-// Register
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, username } = req.body;
-    if (!email || !password || !username) {
-      return res.status(400).json({ error: "Email, password, and username are required" });
-    }
+    if (!email || !password || !username) return res.status(400).json({ error: "Email, password, and username are required" });
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -79,7 +73,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-// Login
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -87,8 +80,6 @@ app.post("/api/auth/login", async (req, res) => {
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-
-    console.log("Supabase login user:", data.user);
 
     res.json({
       message: "Login successful",
@@ -102,7 +93,6 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// Logout
 app.post("/api/auth/logout", async (req, res) => {
   try {
     const { refresh_token } = req.body;
@@ -121,8 +111,6 @@ app.post("/api/auth/logout", async (req, res) => {
 // ==========================
 // RECIPE ENDPOINTS
 // ==========================
-
-// Get all recipes
 app.get("/api/recipes", async (req, res) => {
   try {
     const { data: recipes, error } = await supabase.from("recipes").select("*").order("id");
@@ -166,7 +154,6 @@ app.get("/api/recipes", async (req, res) => {
   }
 });
 
-// Suggest recipes
 app.post("/api/recipes/suggest", async (req, res) => {
   try {
     const { selectedIngredients } = req.body;
@@ -230,7 +217,6 @@ app.post("/api/recipes/suggest", async (req, res) => {
   }
 });
 
-// Get recipe by UUID
 app.get("/api/recipes/:uuid", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
@@ -265,10 +251,8 @@ app.get("/api/recipes/:uuid", async (req, res) => {
 });
 
 // ==========================
-// COMMENTS ENDPOINTS (UUID-safe)
+// COMMENTS & REPLIES
 // ==========================
-
-// Get comments and replies
 app.get("/api/recipes/:uuid/comments", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
@@ -311,7 +295,6 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
   }
 });
 
-// Add comment
 app.post("/api/recipes/:uuid/comments", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
@@ -332,7 +315,6 @@ app.post("/api/recipes/:uuid/comments", async (req, res) => {
   }
 });
 
-// Add reply
 app.post("/api/comments/:id/replies", async (req, res) => {
   try {
     const commentId = req.params.id;
@@ -352,11 +334,6 @@ app.post("/api/comments/:id/replies", async (req, res) => {
     res.status(500).json({ error: "Failed to add reply" });
   }
 });
-
-// ==========================
-// OTHER ENDPOINTS (Ratings, Ingredients, Create Recipe)
-// ==========================
-// Keep all as-is, no parseInt for UUIDs where relevant
 
 // ==========================
 // ROOT & ERROR HANDLING
