@@ -20,32 +20,36 @@ const allowedOrigins = [
   "https://afrifoody.app"
 ];
 
+// CORS
 const corsOptions = {
   origin: function (origin, callback) {
     console.log("Incoming request origin:", origin);
-
-    if (!origin) return callback(null, true); // allow non-browser requests
-    if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) return callback(null, true);
+    if (!origin || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-
     return callback(new Error(`CORS blocked: ${origin} not allowed.`));
   },
   credentials: true,
 };
-
-app.set("trust proxy", 1);
 app.use(cors(corsOptions));
-app.use(compression());
-app.use(express.json());
-app.use(helmet());
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+
+// Comments endpoint using UUID
+app.get("/api/recipes/:uuid/comments", async (req, res) => {
+  try {
+    const recipe_uuid = req.params.uuid;
+    const { data: comments, error } = await supabase
+      .from("comments")
+      .select("id, text, user_id, created_at")
+      .eq("recipe_uuid", recipe_uuid)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    // fetch replies...
+    res.json(comments);
+  } catch (err) {
+    console.error("Comments fetch error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch comments" });
+  }
+});
 
 // ==========================
 // AUTH ENDPOINTS
