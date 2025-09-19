@@ -339,7 +339,7 @@ app.post("/api/comments/:id/replies", async (req, res) => {
 app.get("/api/comments/:id/like-status", async (req, res) => {
   try {
     const commentId = parseInt(req.params.id, 10);
-    const userId = parseInt(req.query.user_id, 10);
+    const userId = req.query.user_id;  // <-- use string UUID
     if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
 
     // Count likes
@@ -371,7 +371,7 @@ app.get("/api/comments/:id/like-status", async (req, res) => {
 app.post("/api/comments/:id/like", async (req, res) => {
   try {
     const commentId = parseInt(req.params.id, 10);
-    const userId = parseInt(req.body.user_id, 10);
+    const userId = req.body.user_id; // <-- use string UUID
     if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
 
     // Check if user already liked
