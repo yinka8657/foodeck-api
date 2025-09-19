@@ -111,7 +111,7 @@ app.get("/api/recipes", async (req, res) => {
     if (error) throw error;
     if (!recipes?.length) return res.json([]);
 
-    const recipeIds = recipes.map((r) => r.id);
+    const recipeIds = recipes.map(r => r.id);
 
     const { data: recipeIng, error: riErr } = await supabase
       .from("recipe_ingredients")
@@ -119,7 +119,7 @@ app.get("/api/recipes", async (req, res) => {
       .in("recipe_id", recipeIds);
     if (riErr) throw riErr;
 
-    const ingredientIds = [...new Set(recipeIng.map((r) => r.ingredient_id))];
+    const ingredientIds = [...new Set(recipeIng.map(r => r.ingredient_id))];
     const { data: ingredients, error: ingErr } = await supabase
       .from("ingredients")
       .select("*")
@@ -127,15 +127,15 @@ app.get("/api/recipes", async (req, res) => {
     if (ingErr) throw ingErr;
 
     const ingredientMap = {};
-    ingredients.forEach((i) => (ingredientMap[i.id] = i));
+    ingredients.forEach(i => (ingredientMap[i.id] = i));
 
     const ingredientsByRecipe = {};
-    recipeIng.forEach((r) => {
+    recipeIng.forEach(r => {
       if (!ingredientsByRecipe[r.recipe_id]) ingredientsByRecipe[r.recipe_id] = [];
       if (ingredientMap[r.ingredient_id]) ingredientsByRecipe[r.recipe_id].push(ingredientMap[r.ingredient_id]);
     });
 
-    const result = recipes.map((r) => ({
+    const result = recipes.map(r => ({
       ...r,
       image: r.image_url,
       ingredients: ingredientsByRecipe[r.id] || [],
@@ -145,68 +145,6 @@ app.get("/api/recipes", async (req, res) => {
   } catch (err) {
     console.error("Recipes fetch error:", err);
     res.status(500).json({ error: "Failed to fetch recipes" });
-  }
-});
-
-app.post("/api/recipes/suggest", async (req, res) => {
-  try {
-    const { selectedIngredients } = req.body;
-    if (!Array.isArray(selectedIngredients) || !selectedIngredients.length)
-      return res.status(400).json({ error: "selectedIngredients must be a non-empty array" });
-
-    const orQuery = selectedIngredients.map((n) => `name.ilike.%${n}%`).join(",");
-    const { data: ingredients, error: ingErr } = await supabase.from("ingredients").select("*").or(orQuery);
-    if (ingErr) throw ingErr;
-    if (!ingredients?.length) return res.json([]);
-
-    const ingredientIds = ingredients.map((i) => i.id);
-    const { data: recipeIng, error: riErr } = await supabase
-      .from("recipe_ingredients")
-      .select("*")
-      .in("ingredient_id", ingredientIds);
-    if (riErr) throw riErr;
-    if (!recipeIng?.length) return res.json([]);
-
-    const recipeIds = [...new Set(recipeIng.map((r) => r.recipe_id))];
-
-    const { data: allRecipeIng, error: allRiErr } = await supabase
-      .from("recipe_ingredients")
-      .select("*")
-      .in("recipe_id", recipeIds);
-    if (allRiErr) throw allRiErr;
-
-    const allIngredientIds = [...new Set(allRecipeIng.map((r) => r.ingredient_id))];
-    const { data: allIngredients, error: allIngErr } = await supabase
-      .from("ingredients")
-      .select("*")
-      .in("id", allIngredientIds);
-    if (allIngErr) throw allIngErr;
-
-    const ingredientMap = {};
-    allIngredients.forEach((i) => (ingredientMap[i.id] = i));
-
-    const ingredientsByRecipe = {};
-    allRecipeIng.forEach((r) => {
-      if (!ingredientsByRecipe[r.recipe_id]) ingredientsByRecipe[r.recipe_id] = [];
-      if (ingredientMap[r.ingredient_id]) ingredientsByRecipe[r.recipe_id].push(ingredientMap[r.ingredient_id]);
-    });
-
-    const { data: recipes, error: recipesErr } = await supabase
-      .from("recipes")
-      .select("*")
-      .in("id", recipeIds);
-    if (recipesErr) throw recipesErr;
-
-    const result = recipes.map((r) => ({
-      ...r,
-      image: r.image_url,
-      ingredients: ingredientsByRecipe[r.id] || [],
-    }));
-
-    res.json(result);
-  } catch (err) {
-    console.error("Recipe suggest error:", err);
-    res.status(500).json({ error: "Failed to suggest recipes" });
   }
 });
 
@@ -228,7 +166,7 @@ app.get("/api/recipes/:uuid", async (req, res) => {
       .eq("recipe_id", recipe.id);
     if (riErr) throw riErr;
 
-    const ingredientIds = recipeIng.map((r) => r.ingredient_id);
+    const ingredientIds = recipeIng.map(r => r.ingredient_id);
     const { data: ingredients, error: ingErr } = await supabase
       .from("ingredients")
       .select("*")
@@ -245,6 +183,68 @@ app.get("/api/recipes/:uuid", async (req, res) => {
   }
 });
 
+app.post("/api/recipes/suggest", async (req, res) => {
+  try {
+    const { selectedIngredients } = req.body;
+    if (!Array.isArray(selectedIngredients) || !selectedIngredients.length)
+      return res.status(400).json({ error: "selectedIngredients must be a non-empty array" });
+
+    const orQuery = selectedIngredients.map(n => `name.ilike.%${n}%`).join(",");
+    const { data: ingredients, error: ingErr } = await supabase.from("ingredients").select("*").or(orQuery);
+    if (ingErr) throw ingErr;
+    if (!ingredients?.length) return res.json([]);
+
+    const ingredientIds = ingredients.map(i => i.id);
+    const { data: recipeIng, error: riErr } = await supabase
+      .from("recipe_ingredients")
+      .select("*")
+      .in("ingredient_id", ingredientIds);
+    if (riErr) throw riErr;
+    if (!recipeIng?.length) return res.json([]);
+
+    const recipeIds = [...new Set(recipeIng.map(r => r.recipe_id))];
+
+    const { data: allRecipeIng, error: allRiErr } = await supabase
+      .from("recipe_ingredients")
+      .select("*")
+      .in("recipe_id", recipeIds);
+    if (allRiErr) throw allRiErr;
+
+    const allIngredientIds = [...new Set(allRecipeIng.map(r => r.ingredient_id))];
+    const { data: allIngredients, error: allIngErr } = await supabase
+      .from("ingredients")
+      .select("*")
+      .in("id", allIngredientIds);
+    if (allIngErr) throw allIngErr;
+
+    const ingredientMap = {};
+    allIngredients.forEach(i => (ingredientMap[i.id] = i));
+
+    const ingredientsByRecipe = {};
+    allRecipeIng.forEach(r => {
+      if (!ingredientsByRecipe[r.recipe_id]) ingredientsByRecipe[r.recipe_id] = [];
+      if (ingredientMap[r.ingredient_id]) ingredientsByRecipe[r.recipe_id].push(ingredientMap[r.ingredient_id]);
+    });
+
+    const { data: recipes, error: recipesErr } = await supabase
+      .from("recipes")
+      .select("*")
+      .in("id", recipeIds);
+    if (recipesErr) throw recipesErr;
+
+    const result = recipes.map(r => ({
+      ...r,
+      image: r.image_url,
+      ingredients: ingredientsByRecipe[r.id] || [],
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("Recipe suggest error:", err);
+    res.status(500).json({ error: "Failed to suggest recipes" });
+  }
+});
+
 // ==========================
 // COMMENTS & REPLIES
 // ==========================
@@ -255,18 +255,19 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 
     const { data: comments, error } = await supabase
       .from("comments")
-      .select("id, text, user_id, created_at")
+      .select("comment_uuid, text, user_id, created_at")
       .eq("recipe_id", recipe_uuid)
       .order("created_at", { ascending: true });
     if (error) throw error;
 
-    const commentIds = comments.map(c => c.id);
+    const commentUuids = comments.map(c => c.comment_uuid);
+
     let replies = [];
-    if (commentIds.length > 0) {
+    if (commentUuids.length > 0) {
       const { data: replyData, error: replyErr } = await supabase
         .from("replies")
         .select("id, comment_id, text, user_id, created_at")
-        .in("comment_id", commentIds)
+        .in("comment_id", commentUuids)
         .order("created_at", { ascending: true });
       if (replyErr) throw replyErr;
       replies = replyData;
@@ -280,7 +281,7 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 
     const result = comments.map(c => ({
       ...c,
-      replies: repliesByComment[c.id] || []
+      replies: repliesByComment[c.comment_uuid] || []
     }));
 
     res.json(result);
@@ -312,15 +313,16 @@ app.post("/api/recipes/:uuid/comments", async (req, res) => {
   }
 });
 
-app.post("/api/comments/:id/replies", async (req, res) => {
+app.post("/api/comments/:uuid/replies", async (req, res) => {
   try {
-    const commentId = req.params.id;
+    const comment_uuid = req.params.uuid;
     const { user_id, text } = req.body;
-    if (!user_id || !text) return res.status(400).json({ error: "user_id and text are required" });
+    if (!uuidRegex.test(comment_uuid) || !user_id || !text)
+      return res.status(400).json({ error: "Invalid comment_uuid or missing fields" });
 
     const { data, error } = await supabase
       .from("replies")
-      .insert([{ comment_id: commentId, user_id, text }])
+      .insert([{ comment_id: comment_uuid, user_id, text }])
       .select()
       .single();
     if (error) throw error;
@@ -335,27 +337,23 @@ app.post("/api/comments/:id/replies", async (req, res) => {
 // ==========================
 // LIKES
 // ==========================
-// Get like count & user liked status
-// Get like count & user liked status
-app.get("/api/comments/:id/like-status", async (req, res) => {
+app.get("/api/comments/:uuid/like-status", async (req, res) => {
   try {
-    const commentId = req.params.id; // <-- UUID string now
-    const userId = req.query.user_id;  
-    if (!uuidRegex.test(commentId) || !userId) 
-      return res.status(400).json({ error: "Invalid commentId or userId" });
+    const comment_uuid = req.params.uuid;
+    const userId = req.query.user_id;
+    if (!uuidRegex.test(comment_uuid) || !userId)
+      return res.status(400).json({ error: "Invalid comment_uuid or user_id" });
 
-    // Count likes
     const { data: likes, error: countErr } = await supabase
       .from("comment_likes")
       .select("*", { count: "exact" })
-      .eq("comment_id", commentId);
+      .eq("comment_id", comment_uuid);
     if (countErr) throw countErr;
 
-    // Check if this user liked
     const { data: userLike, error: userErr } = await supabase
       .from("comment_likes")
       .select("*")
-      .eq("comment_id", commentId)
+      .eq("comment_id", comment_uuid)
       .eq("user_id", userId);
     if (userErr) throw userErr;
 
@@ -369,46 +367,41 @@ app.get("/api/comments/:id/like-status", async (req, res) => {
   }
 });
 
-// Toggle like
-app.post("/api/comments/:id/like", async (req, res) => {
+app.post("/api/comments/:uuid/like", async (req, res) => {
   try {
-    const commentId = req.params.id; // <-- UUID string
-    const userId = req.body.user_id; 
-    if (!uuidRegex.test(commentId) || !userId) 
-      return res.status(400).json({ error: "Invalid commentId or userId" });
+    const comment_uuid = req.params.uuid;
+    const userId = req.body.user_id;
+    if (!uuidRegex.test(comment_uuid) || !userId)
+      return res.status(400).json({ error: "Invalid comment_uuid or user_id" });
 
-    // Check if user already liked
     const { data: existing, error: existErr } = await supabase
       .from("comment_likes")
       .select("*")
-      .eq("comment_id", commentId)
+      .eq("comment_id", comment_uuid)
       .eq("user_id", userId);
     if (existErr) throw existErr;
 
     let action = '';
     if (existing.length > 0) {
-      // Already liked → remove
       const { error: delErr } = await supabase
         .from("comment_likes")
         .delete()
-        .eq("comment_id", commentId)
+        .eq("comment_id", comment_uuid)
         .eq("user_id", userId);
       if (delErr) throw delErr;
       action = 'unliked';
     } else {
-      // Not liked → add
       const { error: insErr } = await supabase
         .from("comment_likes")
-        .insert([{ comment_id: commentId, user_id: userId }]);
+        .insert([{ comment_id: comment_uuid, user_id: userId }]);
       if (insErr) throw insErr;
       action = 'liked';
     }
 
-    // Return new count
     const { data: likes, error: countErr } = await supabase
       .from("comment_likes")
       .select("*", { count: "exact" })
-      .eq("comment_id", commentId);
+      .eq("comment_id", comment_uuid);
     if (countErr) throw countErr;
 
     res.json({ count: likes.length, action });
@@ -417,8 +410,6 @@ app.post("/api/comments/:id/like", async (req, res) => {
     res.status(500).json({ error: "Failed to toggle like" });
   }
 });
-
-
 
 // ==========================
 // ROOT & ERROR HANDLING
@@ -436,4 +427,3 @@ app.use((err, req, res, next) => {
 // SERVER START
 // ==========================
 app.listen(PORT, () => console.log(`✅ API running at http://localhost:${PORT}`));
-
