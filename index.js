@@ -554,6 +554,221 @@ app.post("/api/recipes", async (req, res) => {
 });
 
 // ==========================
+// GET COMMENTS AND REPLIES
+// ==========================
+
+app.get("/api/recipes/:id/comments", async (req, res) => {
+  try {
+    const recipeId = parseInt(req.params.id, 10);
+
+    const { data: comments, error } = await supabase
+      .from("comments")
+      .select("id, text, user_id, created_at")
+      .eq("recipe_id", recipeId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    const commentIds = comments.map(c => c.id);
+
+    let replies = [];
+    if (commentIds.length > 0) {
+      const { data: replyData, error: replyErr } = await supabase
+        .from("replies")
+        .select("id, comment_id, text, user_id, created_at")
+        .in("comment_id", commentIds)
+        .order("created_at", { ascending: true });
+      if (replyErr) throw replyErr;
+      replies = replyData;
+    }
+
+    // group replies by comment_id
+    const repliesByComment = {};
+    replies.forEach(r => {
+      if (!repliesByComment[r.comment_id]) repliesByComment[r.comment_id] = [];
+      repliesByComment[r.comment_id].push(r);
+    });
+
+    const result = comments.map(c => ({
+      ...c,
+      replies: repliesByComment[c.id] || []
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("Comments fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+// ==========================
+// ADD A COMMENT
+// ==========================
+app.post("/api/recipes/:id/comments", async (req, res) => {
+  try {
+    const recipeId = parseInt(req.params.id, 10);
+    const { user_id, text } = req.body;
+
+    if (!user_id || !text) {
+      return res.status(400).json({ error: "user_id and text are required" });
+    }
+
+    const { data, error } = await supabase
+      .from("comments")
+      .insert([{ recipe_id: recipeId, user_id, text }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (err) {
+    console.error("Add comment error:", err);
+    res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+
+// ==========================
+// ADD A REPLY
+// ==========================
+
+app.post("/api/comments/:id/replies", async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id, 10);
+    const { user_id, text } = req.body;
+
+    if (!user_id || !text) {
+      return res.status(400).json({ error: "user_id and text are required" });
+    }
+
+    const { data, error } = await supabase
+      .from("replies")
+      .insert([{ comment_id: commentId, user_id, text }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (err) {
+    console.error("Add reply error:", err);
+    res.status(500).json({ error: "Failed to add reply" });
+  }
+});
+
+// ==========================
+// COMMENT LIKES
+// ==========================
+// Toggle like
+app.post("/api/comments/:id/like", async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id, 10);
+    const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: "user_id required" });
+
+    // Check if user already liked
+    const { data: existing } = await supabase
+      .from("comment_likes")
+      .select("*")
+      .eq("comment_id", commentId)
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    let action;
+    if (existing) {
+      // Unlike
+      await supabase.from("comment_likes").delete().eq("id", existing.id);
+      action = "unliked";
+    } else {
+      // Like
+      await supabase.from("comment_likes").insert([{ comment_id: commentId, user_id }]);
+      action = "liked";
+    }
+
+    // Return updated count
+    const { data: likes } = await supabase
+      .from("comment_likes")
+      .select("*")
+      .eq("comment_id", commentId);
+
+    res.json({ action, count: likes.length });
+  } catch (err) {
+    console.error("Like toggle error:", err);
+    res.status(500).json({ error: "Failed to toggle like" });
+  }
+});
+
+// ==========================
+// REPLY LIKES
+// ==========================
+
+// Toggle like for a reply
+app.post("/api/replies/:id/like", async (req, res) => {
+  try {
+    const replyId = parseInt(req.params.id, 10);
+    const { user_id } = req.body;
+    if (!user_id) return res.status(400).json({ error: "user_id required" });
+
+    // Check if user already liked this reply
+    const { data: existing } = await supabase
+      .from("reply_likes")
+      .select("*")
+      .eq("reply_id", replyId)
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    let action;
+    if (existing) {
+      // Unlike
+      await supabase.from("reply_likes").delete().eq("id", existing.id);
+      action = "unliked";
+    } else {
+      // Like
+      await supabase.from("reply_likes").insert([{ reply_id: replyId, user_id }]);
+      action = "liked";
+    }
+
+    // Return updated count
+    const { data: likes } = await supabase
+      .from("reply_likes")
+      .select("*")
+      .eq("reply_id", replyId);
+
+    res.json({ action, count: likes.length });
+  } catch (err) {
+    console.error("Reply like toggle error:", err);
+    res.status(500).json({ error: "Failed to toggle like" });
+  }
+});
+
+// Check if user has liked a reply
+app.get("/api/replies/:id/isliked", async (req, res) => {
+  try {
+    const replyId = parseInt(req.params.id, 10);
+    const userId = req.query.user_id;
+    if (!userId) return res.status(400).json({ error: "user_id query required" });
+
+    const { data: existing, error } = await supabase
+      .from("reply_likes")
+      .select("*")
+      .eq("reply_id", replyId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    res.json({ isLiked: !!existing });
+  } catch (err) {
+    console.error("Reply like status error:", err);
+    res.status(500).json({ error: "Failed to fetch like status" });
+  }
+});
+
+
+
+
+// ==========================
 // ROOT HEALTH CHECK
 // ==========================
 app.get("/", (req, res) => {
