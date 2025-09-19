@@ -3,7 +3,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 const compression = require("compression");
 
 const { supabase } = require("./supabaseClient");
@@ -12,15 +11,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ==========================
-// CORS CONFIGURATION
+// MIDDLEWARE
 // ==========================
+app.use(helmet());
+app.use(compression());
+app.use(express.json());
+
 const allowedOrigins = [
   "https://afrifoody.onrender.com",
   "https://afrifoody.netlify.app",
   "https://afrifoody.app"
 ];
 
-// CORS
 const corsOptions = {
   origin: function (origin, callback) {
     console.log("Incoming request origin:", origin);
@@ -32,24 +34,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Comments endpoint using UUID
-app.get("/api/recipes/:uuid/comments", async (req, res) => {
-  try {
-    const recipe_uuid = req.params.uuid;
-    const { data: comments, error } = await supabase
-      .from("comments")
-      .select("id, text, user_id, created_at")
-      .eq("recipe_uuid", recipe_uuid)
-      .order("created_at", { ascending: true });
-    if (error) throw error;
-
-    // fetch replies...
-    res.json(comments);
-  } catch (err) {
-    console.error("Comments fetch error:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch comments" });
-  }
-});
+// ==========================
+// HELPER
+// ==========================
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // ==========================
 // AUTH ENDPOINTS
@@ -57,7 +45,8 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 app.post("/api/auth/register", async (req, res) => {
   try {
     const { email, password, username } = req.body;
-    if (!email || !password || !username) return res.status(400).json({ error: "Email, password, and username are required" });
+    if (!email || !password || !username)
+      return res.status(400).json({ error: "Email, password, and username are required" });
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -80,7 +69,8 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Email and password are required" });
+    if (!email || !password)
+      return res.status(400).json({ error: "Email and password are required" });
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -113,7 +103,7 @@ app.post("/api/auth/logout", async (req, res) => {
 });
 
 // ==========================
-// RECIPE ENDPOINTS
+// RECIPES ENDPOINTS
 // ==========================
 app.get("/api/recipes", async (req, res) => {
   try {
@@ -137,7 +127,7 @@ app.get("/api/recipes", async (req, res) => {
     if (ingErr) throw ingErr;
 
     const ingredientMap = {};
-    ingredients.forEach((i) => ingredientMap[i.id] = i);
+    ingredients.forEach((i) => (ingredientMap[i.id] = i));
 
     const ingredientsByRecipe = {};
     recipeIng.forEach((r) => {
@@ -161,9 +151,8 @@ app.get("/api/recipes", async (req, res) => {
 app.post("/api/recipes/suggest", async (req, res) => {
   try {
     const { selectedIngredients } = req.body;
-    if (!Array.isArray(selectedIngredients) || !selectedIngredients.length) {
+    if (!Array.isArray(selectedIngredients) || !selectedIngredients.length)
       return res.status(400).json({ error: "selectedIngredients must be a non-empty array" });
-    }
 
     const orQuery = selectedIngredients.map((n) => `name.ilike.%${n}%`).join(",");
     const { data: ingredients, error: ingErr } = await supabase.from("ingredients").select("*").or(orQuery);
@@ -194,7 +183,7 @@ app.post("/api/recipes/suggest", async (req, res) => {
     if (allIngErr) throw allIngErr;
 
     const ingredientMap = {};
-    allIngredients.forEach((i) => ingredientMap[i.id] = i);
+    allIngredients.forEach((i) => (ingredientMap[i.id] = i));
 
     const ingredientsByRecipe = {};
     allRecipeIng.forEach((r) => {
@@ -224,6 +213,8 @@ app.post("/api/recipes/suggest", async (req, res) => {
 app.get("/api/recipes/:uuid", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
+    if (!uuidRegex.test(recipe_uuid)) return res.status(400).json({ error: "Invalid recipe UUID" });
+
     const { data: recipe, error } = await supabase
       .from("recipes")
       .select("*")
@@ -260,6 +251,7 @@ app.get("/api/recipes/:uuid", async (req, res) => {
 app.get("/api/recipes/:uuid/comments", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
+    if (!uuidRegex.test(recipe_uuid)) return res.status(400).json({ error: "Invalid recipe UUID" });
 
     const { data: comments, error } = await supabase
       .from("comments")
@@ -269,7 +261,6 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
     if (error) throw error;
 
     const commentIds = comments.map(c => c.id);
-
     let replies = [];
     if (commentIds.length > 0) {
       const { data: replyData, error: replyErr } = await supabase
@@ -302,6 +293,8 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 app.post("/api/recipes/:uuid/comments", async (req, res) => {
   try {
     const recipe_uuid = req.params.uuid;
+    if (!uuidRegex.test(recipe_uuid)) return res.status(400).json({ error: "Invalid recipe UUID" });
+
     const { user_id, text } = req.body;
     if (!user_id || !text) return res.status(400).json({ error: "user_id and text are required" });
 
