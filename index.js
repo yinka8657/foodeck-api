@@ -256,7 +256,7 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
     const { data: comments, error } = await supabase
       .from("comments")
       .select("id, text, user_id, created_at")
-      .eq("recipe_uuid", recipe_uuid)
+      .eq("recipe_id", recipe_uuid)
       .order("created_at", { ascending: true });
     if (error) throw error;
 
@@ -300,7 +300,7 @@ app.post("/api/recipes/:uuid/comments", async (req, res) => {
 
     const { data, error } = await supabase
       .from("comments")
-      .insert([{ recipe_uuid, user_id, text }])
+      .insert([{ recipe_id: recipe_uuid, user_id, text }])
       .select()
       .single();
     if (error) throw error;
@@ -348,3 +348,4 @@ app.use((err, req, res, next) => {
 // SERVER START
 // ==========================
 app.listen(PORT, () => console.log(`✅ API running at http://localhost:${PORT}`));
+
