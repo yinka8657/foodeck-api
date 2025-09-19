@@ -333,6 +333,90 @@ app.post("/api/comments/:id/replies", async (req, res) => {
 });
 
 // ==========================
+// LIKES
+// ==========================
+// Get like count & user liked status
+app.get("/api/comments/:id/like-status", async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id, 10);
+    const userId = parseInt(req.query.user_id, 10);
+    if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
+
+    // Count likes
+    const { data: likes, error: countErr } = await supabase
+      .from("comment_likes")
+      .select("*", { count: "exact" })
+      .eq("comment_id", commentId);
+    if (countErr) throw countErr;
+
+    // Check if this user liked
+    const { data: userLike, error: userErr } = await supabase
+      .from("comment_likes")
+      .select("*")
+      .eq("comment_id", commentId)
+      .eq("user_id", userId);
+    if (userErr) throw userErr;
+
+    res.json({
+      count: likes.length,
+      isLiked: userLike.length > 0
+    });
+  } catch (err) {
+    console.error("Like status error:", err);
+    res.status(500).json({ error: "Failed to fetch like status" });
+  }
+});
+
+// Toggle like
+app.post("/api/comments/:id/like", async (req, res) => {
+  try {
+    const commentId = parseInt(req.params.id, 10);
+    const userId = parseInt(req.body.user_id, 10);
+    if (!commentId || !userId) return res.status(400).json({ error: "Invalid commentId or userId" });
+
+    // Check if user already liked
+    const { data: existing, error: existErr } = await supabase
+      .from("comment_likes")
+      .select("*")
+      .eq("comment_id", commentId)
+      .eq("user_id", userId);
+    if (existErr) throw existErr;
+
+    let action = '';
+    if (existing.length > 0) {
+      // Already liked → remove
+      const { error: delErr } = await supabase
+        .from("comment_likes")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", userId);
+      if (delErr) throw delErr;
+      action = 'unliked';
+    } else {
+      // Not liked → add
+      const { error: insErr } = await supabase
+        .from("comment_likes")
+        .insert([{ comment_id: commentId, user_id: userId }]);
+      if (insErr) throw insErr;
+      action = 'liked';
+    }
+
+    // Return new count
+    const { data: likes, error: countErr } = await supabase
+      .from("comment_likes")
+      .select("*", { count: "exact" })
+      .eq("comment_id", commentId);
+    if (countErr) throw countErr;
+
+    res.json({ count: likes.length, action });
+  } catch (err) {
+    console.error("Toggle like error:", err);
+    res.status(500).json({ error: "Failed to toggle like" });
+  }
+});
+
+
+// ==========================
 // ROOT & ERROR HANDLING
 // ==========================
 app.get("/", (req, res) => res.send("✅ Afrifoody API is running"));
