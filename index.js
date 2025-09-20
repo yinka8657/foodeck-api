@@ -526,34 +526,53 @@ app.delete("/api/comments/:uuid", async (req, res) => {
   try {
     const comment_uuid = req.params.uuid;
 
-    if (!uuidRegex.test(comment_uuid))
+    // Validate UUID format
+    if (!uuidRegex.test(comment_uuid)) {
+      console.log("❌ Invalid comment UUID:", comment_uuid);
       return res.status(400).json({ error: "Invalid comment UUID" });
+    }
 
-    // First, delete all replies associated with this comment
-    const { error: replyDelErr } = await supabase
+    console.log("➡️ Deleting comment and replies for UUID:", comment_uuid);
+
+    // 1️⃣ Delete all replies linked to this comment
+    const { data: deletedReplies, error: replyDelErr } = await supabase
       .from("replies")
       .delete()
-      .eq("parent_comment_uuid", comment_uuid);
-    if (replyDelErr) throw replyDelErr;
+      .eq("parent_comment_uuid", comment_uuid)
+      .select();
 
-    // Then, delete the comment itself
-    const { data: deletedComment, error: commentDelErr } = await supabase
+    if (replyDelErr) throw replyDelErr;
+    console.log(`Deleted ${deletedReplies?.length || 0} replies`);
+
+    // 2️⃣ Delete the comment itself
+    const { data: deletedComments, error: commentDelErr } = await supabase
       .from("comments")
       .delete()
       .eq("comment_uuid", comment_uuid)
-      .select()
-      .single();
+      .select(); // returns an array of deleted rows
+
     if (commentDelErr) throw commentDelErr;
+
+    // 3️⃣ Check if comment existed
+    if (!deletedComments || deletedComments.length === 0) {
+      console.log("❌ Comment not found:", comment_uuid);
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    console.log("✅ Deleted comment:", deletedComments[0]);
 
     res.json({
       message: "Comment and its replies deleted successfully",
-      deletedComment
+      deletedComment: deletedComments[0],
+      deletedRepliesCount: deletedReplies?.length || 0,
     });
+
   } catch (err) {
-    console.error("Delete comment error:", err);
+    console.error("❌ Error deleting comment:", err);
     res.status(500).json({ error: "Failed to delete comment" });
   }
 });
+
 
 
 
