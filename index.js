@@ -421,6 +421,90 @@ app.post("/api/comments/:uuid/like", async (req, res) => {
 });
 
 // ==========================
+// REPLY LIKES
+// ==========================
+app.get("/api/replies/:uuid/like-status", async (req, res) => {
+  try {
+    const reply_uuid = req.params.uuid;
+    const userId = req.query.user_id;
+    if (!uuidRegex.test(reply_uuid) || !userId)
+      return res.status(400).json({ error: "Invalid reply_uuid or user_id" });
+
+    // Count total likes
+    const { data: likes, error: countErr } = await supabase
+      .from("reply_likes")
+      .select("*", { count: "exact" })
+      .eq("reply_id", reply_uuid);
+    if (countErr) throw countErr;
+
+    // Check if current user liked
+    const { data: userLike, error: userErr } = await supabase
+      .from("reply_likes")
+      .select("*")
+      .eq("reply_id", reply_uuid)
+      .eq("user_id", userId);
+    if (userErr) throw userErr;
+
+    res.json({
+      count: likes.length,
+      isLiked: userLike.length > 0
+    });
+  } catch (err) {
+    console.error("Reply like status error:", err);
+    res.status(500).json({ error: "Failed to fetch reply like status" });
+  }
+});
+
+app.post("/api/replies/:uuid/like", async (req, res) => {
+  try {
+    const reply_uuid = req.params.uuid;
+    const userId = req.body.user_id;
+    if (!uuidRegex.test(reply_uuid) || !userId)
+      return res.status(400).json({ error: "Invalid reply_uuid or user_id" });
+
+    // Check if user already liked
+    const { data: existing, error: existErr } = await supabase
+      .from("reply_likes")
+      .select("*")
+      .eq("reply_id", reply_uuid)
+      .eq("user_id", userId);
+    if (existErr) throw existErr;
+
+    let action = '';
+    if (existing.length > 0) {
+      // Unlike
+      const { error: delErr } = await supabase
+        .from("reply_likes")
+        .delete()
+        .eq("reply_id", reply_uuid)
+        .eq("user_id", userId);
+      if (delErr) throw delErr;
+      action = 'unliked';
+    } else {
+      // Like
+      const { error: insErr } = await supabase
+        .from("reply_likes")
+        .insert([{ reply_id: reply_uuid, user_id: userId }]);
+      if (insErr) throw insErr;
+      action = 'liked';
+    }
+
+    // Return updated count
+    const { data: likes, error: countErr } = await supabase
+      .from("reply_likes")
+      .select("*", { count: "exact" })
+      .eq("reply_id", reply_uuid);
+    if (countErr) throw countErr;
+
+    res.json({ count: likes.length, action });
+  } catch (err) {
+    console.error("Toggle reply like error:", err);
+    res.status(500).json({ error: "Failed to toggle reply like" });
+  }
+});
+
+
+// ==========================
 // ROOT & ERROR HANDLING
 // ==========================
 app.get("/", (req, res) => res.send("✅ Afrifoody API is running"));
