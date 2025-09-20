@@ -269,7 +269,7 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
     for (const comment of comments) {
       const { data: replies, error: replyError } = await supabase
         .from("replies")
-        .select("id, reply_uuid, text, user_id, created_at, parent_id")
+        .select("id, reply_uuid, text, user_id, created_at")
         .eq("comment_id", comment.comment_uuid)
         .order("created_at", { ascending: true });
 
