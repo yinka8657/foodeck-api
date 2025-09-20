@@ -271,7 +271,7 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
      const { data: replies, error: replyError } = await supabase
        .from("replies")
         .select("id, reply_uuid, text, user_id, created_at")
-        .eq("comment_id", comment.comment_uuid)
+        .eq("parent_comment_uuid", comment.comment_uuid) 
         .order("created_at", { ascending: true });
 
         if (replyError) throw replyError;
