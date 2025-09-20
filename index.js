@@ -316,16 +316,24 @@ app.post("/api/recipes/:uuid/comments", async (req, res) => {
 
 app.post("/api/comments/:uuid/replies", async (req, res) => {
   try {
-    const comment_uuid = req.params.uuid;
+    const parent_comment_uuid = req.params.uuid;
     const { user_id, text } = req.body;
-    if (!uuidRegex.test(comment_uuid) || !user_id || !text)
-      return res.status(400).json({ error: "Invalid comment_uuid or missing fields" });
 
+    // Validate inputs
+    if (!uuidRegex.test(parent_comment_uuid) || !user_id || !text)
+      return res.status(400).json({ error: "Invalid comment UUID or missing fields" });
+
+    // Insert into replies table
     const { data, error } = await supabase
       .from("replies")
-      .insert([{ comment_id: comment_uuid, user_id, text }])
+      .insert([{
+        parent_comment_uuid,  // links reply to comment
+        user_id,
+        text
+      }])
       .select()
       .single();
+
     if (error) throw error;
 
     res.status(201).json(data);
