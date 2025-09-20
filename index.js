@@ -266,22 +266,18 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 
     console.log("✅ Fetched comments from DB:", comments);
 
-    // Disable replies fetching for now
-    // for (const comment of comments) {
-    //   const { data: replies, error: replyError } = await supabase
-    //     .from("replies")
-    //     .select("id, reply_uuid, text, user_id, created_at")
-    //     .eq("comment_id", comment.comment_uuid)
-    //     .order("created_at", { ascending: true });
-
-    //   if (replyError) throw replyError;
-    //   comment.replies = replies;
-    // }
-
-    // Just add empty replies array for now
+    
     for (const comment of comments) {
-      comment.replies = [];
-    }
+     const { data: replies, error: replyError } = await supabase
+       .from("replies")
+        .select("id, reply_uuid, text, user_id, created_at")
+        .eq("comment_id", comment.comment_uuid)
+        .order("created_at", { ascending: true });
+
+        if (replyError) throw replyError;
+         comment.replies = replies;
+      }
+
 
     res.json(comments);
   } catch (err) {   // ✅ now valid
