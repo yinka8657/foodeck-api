@@ -249,7 +249,7 @@ app.post("/api/recipes/suggest", async (req, res) => {
 // COMMENTS & REPLIES
 // ==========================
 app.get("/api/recipes/:uuid/comments", async (req, res) => {
-  try {
+  console.log("➡️ Incoming GET /api/recipes/:uuid/comments", req.params); // 🔎 add this line
     const recipe_uuid = req.params.uuid;
     if (!uuidRegex.test(recipe_uuid))
       return res.status(400).json({ error: "Invalid recipe UUID" });
