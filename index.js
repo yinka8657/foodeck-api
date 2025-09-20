@@ -518,6 +518,44 @@ app.post("/api/replies/:uuid/like", async (req, res) => {
   }
 });
 
+// ==========================
+// // DELETE a comment and its replies
+// ==========================
+
+app.delete("/api/comments/:uuid", async (req, res) => {
+  try {
+    const comment_uuid = req.params.uuid;
+
+    if (!uuidRegex.test(comment_uuid))
+      return res.status(400).json({ error: "Invalid comment UUID" });
+
+    // First, delete all replies associated with this comment
+    const { error: replyDelErr } = await supabase
+      .from("replies")
+      .delete()
+      .eq("parent_comment_uuid", comment_uuid);
+    if (replyDelErr) throw replyDelErr;
+
+    // Then, delete the comment itself
+    const { data: deletedComment, error: commentDelErr } = await supabase
+      .from("comments")
+      .delete()
+      .eq("comment_uuid", comment_uuid)
+      .select()
+      .single();
+    if (commentDelErr) throw commentDelErr;
+
+    res.json({
+      message: "Comment and its replies deleted successfully",
+      deletedComment
+    });
+  } catch (err) {
+    console.error("Delete comment error:", err);
+    res.status(500).json({ error: "Failed to delete comment" });
+  }
+});
+
+
 
 
 // ==========================
