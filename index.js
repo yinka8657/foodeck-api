@@ -249,7 +249,9 @@ app.post("/api/recipes/suggest", async (req, res) => {
 // COMMENTS & REPLIES
 // ==========================
 app.get("/api/recipes/:uuid/comments", async (req, res) => {
-  console.log("➡️ Incoming GET /api/recipes/:uuid/comments", req.params); // 🔎 add this line
+  try {  // ✅ add this
+    console.log("➡️ Incoming GET /api/recipes/:uuid/comments", req.params);
+
     const recipe_uuid = req.params.uuid;
     if (!uuidRegex.test(recipe_uuid))
       return res.status(400).json({ error: "Invalid recipe UUID" });
@@ -262,8 +264,7 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
 
     if (error) throw error;
 
-    // 🔎 Debug log goes here
-    console.log("Fetched comments from DB:", comments);
+    console.log("✅ Fetched comments from DB:", comments);
 
     for (const comment of comments) {
       const { data: replies, error: replyError } = await supabase
@@ -277,11 +278,12 @@ app.get("/api/recipes/:uuid/comments", async (req, res) => {
     }
 
     res.json(comments);
-  } catch (err) {
-    console.error("Error fetching comments:", err);
+  } catch (err) {   // ✅ now valid
+    console.error("❌ Error fetching comments:", err);
     res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
+
 
 
 app.post("/api/recipes/:uuid/comments", async (req, res) => {
