@@ -457,10 +457,19 @@ app.get("/api/replies/:uuid/like-status", async (req, res) => {
 
 app.post("/api/replies/:uuid/like", async (req, res) => {
   try {
+    console.log("➡️ Incoming POST /api/replies/:uuid/like");
+    console.log("Params:", req.params);
+    console.log("Body:", req.body);
+
     const reply_uuid = req.params.uuid;
     const userId = req.body.user_id;
-    if (!uuidRegex.test(reply_uuid) || !userId)
+
+    console.log("Parsed reply_uuid:", reply_uuid, "userId:", userId);
+
+    if (!uuidRegex.test(reply_uuid) || !userId) {
+      console.log("❌ Invalid UUID or missing userId");
       return res.status(400).json({ error: "Invalid reply_uuid or user_id" });
+    }
 
     // Check if user already liked
     const { data: existing, error: existErr } = await supabase
@@ -468,7 +477,10 @@ app.post("/api/replies/:uuid/like", async (req, res) => {
       .select("*")
       .eq("reply_id", reply_uuid)
       .eq("user_id", userId);
+
     if (existErr) throw existErr;
+
+    console.log("Existing likes for this user:", existing);
 
     let action = '';
     if (existing.length > 0) {
@@ -478,15 +490,19 @@ app.post("/api/replies/:uuid/like", async (req, res) => {
         .delete()
         .eq("reply_id", reply_uuid)
         .eq("user_id", userId);
+
       if (delErr) throw delErr;
       action = 'unliked';
+      console.log(`User ${userId} unliked reply ${reply_uuid}`);
     } else {
       // Like
       const { error: insErr } = await supabase
         .from("reply_likes")
         .insert([{ reply_id: reply_uuid, user_id: userId }]);
+
       if (insErr) throw insErr;
       action = 'liked';
+      console.log(`User ${userId} liked reply ${reply_uuid}`);
     }
 
     // Return updated count
@@ -494,7 +510,10 @@ app.post("/api/replies/:uuid/like", async (req, res) => {
       .from("reply_likes")
       .select("*", { count: "exact" })
       .eq("reply_id", reply_uuid);
+
     if (countErr) throw countErr;
+
+    console.log("Total likes after toggle:", likes.length);
 
     res.json({ count: likes.length, action });
   } catch (err) {
@@ -502,6 +521,7 @@ app.post("/api/replies/:uuid/like", async (req, res) => {
     res.status(500).json({ error: "Failed to toggle reply like" });
   }
 });
+
 
 
 // ==========================
